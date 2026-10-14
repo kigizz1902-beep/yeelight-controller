@@ -7,7 +7,8 @@ export type YeelightErrorCode =
   | "CONNECTION_TIMEOUT"
   | "DEVICE_REFUSED"
   | "INVALID_RESPONSE"
-  | "INVALID_HEX";
+  | "INVALID_HEX"
+  | "INVALID_BRIGHTNESS";
 
 export class YeelightError extends Error {
   code: YeelightErrorCode;
@@ -121,6 +122,22 @@ export function hexToYeelightRgb(hex: string): number {
 export async function setColor(ip: string, hex: string): Promise<void> {
   const rgb = hexToYeelightRgb(hex);
   const response = await sendCommand(ip, "set_rgb", [rgb, "smooth", 500]);
+  if (response.error) {
+    throw new YeelightError(
+      "DEVICE_REFUSED",
+      `기기가 명령을 거부했습니다: ${response.error.message}`,
+    );
+  }
+}
+
+export async function setBright(ip: string, bright: number): Promise<void> {
+  if (!Number.isInteger(bright) || bright < 1 || bright > 100) {
+    throw new YeelightError(
+      "INVALID_BRIGHTNESS",
+      `밝기 값이 잘못되었습니다: ${bright} (1~100 사이 정수만 허용)`,
+    );
+  }
+  const response = await sendCommand(ip, "set_bright", [bright, "smooth", 300]);
   if (response.error) {
     throw new YeelightError(
       "DEVICE_REFUSED",

@@ -1,14 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const IP_STORAGE_KEY = "yeelight_dev_ip";
 const HEX_PATTERN = /^#?[0-9a-fA-F]{6}$/;
-
-function readSavedIp(): string {
-  if (typeof window === "undefined") return "";
-  return window.localStorage.getItem(IP_STORAGE_KEY) ?? "";
-}
 
 interface LogEntry {
   time: string;
@@ -19,12 +14,13 @@ interface LogEntry {
 }
 
 export default function YeelightDevPage() {
-  const [ip, setIp] = useState(readSavedIp);
+  const [ip, setIp] = useState("");
   const [ipSaved, setIpSaved] = useState(false);
   const [status, setStatus] = useState<string>("");
   const [loading, setLoading] = useState(false);
 
   const [hex, setHex] = useState("#FFFFFF");
+  const [bright, setBright] = useState(100);
   const [blinkTimes, setBlinkTimes] = useState(5);
   const [blinkInterval, setBlinkInterval] = useState(500);
   const [deviceStatus, setDeviceStatus] = useState<{
@@ -33,6 +29,14 @@ export default function YeelightDevPage() {
     bright: number;
   } | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem(IP_STORAGE_KEY);
+    if (saved) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- browser-only localStorage can't be read during SSR, so this must happen post-mount
+      setIp(saved);
+    }
+  }, []);
 
   function saveIp() {
     window.localStorage.setItem(IP_STORAGE_KEY, ip);
@@ -109,6 +113,18 @@ export default function YeelightDevPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ip, hex }),
+    });
+  }
+
+  function sendBright() {
+    if (!Number.isInteger(bright) || bright < 1 || bright > 100) {
+      setStatus("에러: 밝기는 1~100 사이 정수여야 합니다.");
+      return;
+    }
+    return runCommand("밝기 조절", "/api/yeelight/bright", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ip, bright }),
     });
   }
 
@@ -193,6 +209,24 @@ export default function YeelightDevPage() {
             disabled={loading || !ipValid || !HEX_PATTERN.test(hex)}
             onClick={sendColor}
           >
+            적용
+          </button>
+        </div>
+      </section>
+
+      <section style={{ marginTop: 24 }}>
+        <h2 style={{ fontSize: 16 }}>밝기</h2>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            type="range"
+            min={1}
+            max={100}
+            value={bright}
+            onChange={(e) => setBright(Number(e.target.value))}
+            style={{ flex: 1 }}
+          />
+          <span style={{ width: 48, textAlign: "right" }}>{bright}%</span>
+          <button disabled={loading || !ipValid} onClick={sendBright}>
             적용
           </button>
         </div>
